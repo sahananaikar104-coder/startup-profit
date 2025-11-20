@@ -5,7 +5,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 
 # Load Dataset
-df = pd.read_csv(r'C:\Users\sahan\Downloads\50_Startups.csv')
+df = pd.read_csv('50_Startups.csv')
+
 
 # Encode 'State'
 df = pd.get_dummies(df, columns=['State'], drop_first=True)
