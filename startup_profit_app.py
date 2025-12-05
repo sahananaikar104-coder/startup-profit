@@ -2,84 +2,49 @@ import streamlit as st
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 
-st.set_page_config(page_title="Startup Profit Predictor", layout="centered")
+# Load dataset
+df = pd.read_csv('50_Startups_IndianStates.csv')
 
-st.title("📊 Startup Profit Predictor ")
-st.write("Predict profit based on R&D, Administration, Marketing Spend and Location.")
+# Convert State column to dummies
+df = pd.get_dummies(df, columns=['State'], drop_first=True)
 
-# ----------------------------
-# Load Dataset
-# ----------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("50_Startups_IndianStates.csv")
-    return df
-
-df = load_data()
-
-# ----------------------------
-# Preprocessing
-# ----------------------------
-# One-hot encode the State column
-df_encoded = pd.get_dummies(df, columns=["State"], drop_first=True)
-
-# Feature selection
-X = df_encoded.drop("Profit", axis=1)
-y = df_encoded["Profit"]
+# Features and target
+X = df.drop('Profit', axis=1)
+y = df['Profit']
 
 # Train-test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train model
-model = LinearRegression()
-model.fit(X_train, y_train)
+# Models
+lr_model = LinearRegression().fit(X_train, y_train)
+rf_model = RandomForestRegressor().fit(X_train, y_train)
 
-# Get columns for prediction input
-model_columns = X_train.columns
+# Streamlit UI
+st.title("🚀 Startup Profit Prediction (Indian Cities Version)")
+st.write("Enter details to predict startup profit")
 
-# ----------------------------
-# User Input Section
-# ----------------------------
-st.subheader("Enter Startup Details")
+# Inputs
+rd = st.number_input("R&D Spend", min_value=0.0)
+admin = st.number_input("Administration Spend", min_value=0.0)
+marketing = st.number_input("Marketing Spend", min_value=0.0)
 
-rd_spend = st.number_input("R&D Spend", min_value=0.0, step=1000.0)
-admin_spend = st.number_input("Administration Spend", min_value=0.0, step=1000.0)
-marketing_spend = st.number_input("Marketing Spend", min_value=0.0, step=1000.0)
+state = st.selectbox("State", ["Bangalore", "Mysuru", "Bagalkote"])
 
-state = st.selectbox("Select Location", ["Bangalore", "Mysuru", "Bagalkote"])
+# Prepare input row
+input_data = pd.DataFrame({
+    'R&D Spend': [rd],
+    'Administration': [admin],
+    'Marketing Spend': [marketing],
+    'State_Mysuru': [1 if state == "Mysuru" else 0],
+    'State_Bagalkote': [1 if state == "Bagalkote" else 0]
+})
 
-# ----------------------------
-# Prepare Input Data for Model
-# ----------------------------
-import numpy as np
-
-input_df = pd.DataFrame(np.zeros((1, len(model_columns))), columns=model_columns)
-
-# Fill numeric values
-input_df["R&D Spend"] = rd_spend
-input_df["Administration"] = admin_spend
-input_df["Marketing Spend"] = marketing_spend
-
-# Handle dummy variables
-# Your dataset creates dummy columns like: State_Bagalkote, State_Bangalore, State_Mysuru
-for col in model_columns:
-    if col.startswith("State_"):
-        city_name = col.replace("State_", "")
-        input_df[col] = 1 if state == city_name else 0
-
-# ----------------------------
-# Prediction
-# ----------------------------
+# Predict
 if st.button("Predict Profit"):
-    prediction = model.predict(input_df)[0]
-    st.success(f"💰 **Predicted Profit: ₹{prediction:,.2f}**")
+    lr_pred = lr_model.predict(input_data)[0]
+    rf_pred = rf_model.predict(input_data)[0]
 
-# ----------------------------
-# Show Dataset (Optional)
-# ----------------------------
-with st.expander("Show Dataset"):
-    st.dataframe(df)
-
+    st.success(f"Linear Regression Profit: ₹{lr_pred:,.0f}")
+    st.success(f"Random Forest Profit: ₹{rf_pred:,.0f}")
