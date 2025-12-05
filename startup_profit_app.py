@@ -1,58 +1,85 @@
 import streamlit as st
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 
+st.set_page_config(page_title="Startup Profit Predictor", layout="centered")
+
+st.title("📊 Startup Profit Predictor ")
+st.write("Predict profit based on R&D, Administration, Marketing Spend and Location.")
+
+# ----------------------------
 # Load Dataset
-df = pd.read_csv('50_Startups.csv')
+# ----------------------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv("50_Startups_IndianStates.csv")
+    return df
 
+df = load_data()
 
-# Encode 'State'
-df = pd.get_dummies(df, columns=['State'], drop_first=True)
+# ----------------------------
+# Preprocessing
+# ----------------------------
+# One-hot encode the State column
+df_encoded = pd.get_dummies(df, columns=["State"], drop_first=True)
 
-# Split Features and Target
-X = df.drop('Profit', axis=1)
-y = df['Profit']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Feature selection
+X = df_encoded.drop("Profit", axis=1)
+y = df_encoded["Profit"]
 
-# Train Models
-lr_model = LinearRegression()
-lr_model.fit(X_train, y_train)
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
-rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-rf_model.fit(X_train, y_train)
+# Train model
+model = LinearRegression()
+model.fit(X_train, y_train)
 
-# Streamlit App Layout
-st.title("🚀 Startup Profit Predictor")
-st.markdown("Enter startup details below to predict the expected profit:")
+# Get columns for prediction input
+model_columns = X_train.columns
 
-# Input widgets
-rd_spend = st.number_input("R&D Spend", min_value=0, value=0)
-admin_spend = st.number_input("Administration Spend", min_value=0, value=0)
-marketing_spend = st.number_input("Marketing Spend", min_value=0, value=0)
-state = st.selectbox("State", ["California", "New York", "Florida"])
+# ----------------------------
+# User Input Section
+# ----------------------------
+st.subheader("Enter Startup Details")
 
-# Button
+rd_spend = st.number_input("R&D Spend", min_value=0.0, step=1000.0)
+admin_spend = st.number_input("Administration Spend", min_value=0.0, step=1000.0)
+marketing_spend = st.number_input("Marketing Spend", min_value=0.0, step=1000.0)
+
+state = st.selectbox("Select Location", ["Bangalore", "Mysuru", "Bagalkote"])
+
+# ----------------------------
+# Prepare Input Data for Model
+# ----------------------------
+import numpy as np
+
+input_df = pd.DataFrame(np.zeros((1, len(model_columns))), columns=model_columns)
+
+# Fill numeric values
+input_df["R&D Spend"] = rd_spend
+input_df["Administration"] = admin_spend
+input_df["Marketing Spend"] = marketing_spend
+
+# Handle dummy variables
+# Your dataset creates dummy columns like: State_Bagalkote, State_Bangalore, State_Mysuru
+for col in model_columns:
+    if col.startswith("State_"):
+        city_name = col.replace("State_", "")
+        input_df[col] = 1 if state == city_name else 0
+
+# ----------------------------
+# Prediction
+# ----------------------------
 if st.button("Predict Profit"):
-    # Prepare input data
-    input_data = pd.DataFrame(0, index=[0], columns=X_train.columns)
-    input_data['R&D Spend'] = rd_spend
-    input_data['Administration'] = admin_spend
-    input_data['Marketing Spend'] = marketing_spend
-    if 'State_California' in input_data.columns:
-        input_data['State_California'] = 1 if state=="California" else 0
-    if 'State_New York' in input_data.columns:
-        input_data['State_New York'] = 1 if state=="New York" else 0
-    
-    # Predict
-    lr_pred = lr_model.predict(input_data)[0]
-    rf_pred = rf_model.predict(input_data)[0]
-    
-    # Display results
-    st.subheader("📊 Predicted Profits")
-    st.markdown(f"**Linear Regression:** ₹{lr_pred:,.0f}")
-    st.markdown(f"**Random Forest:** ₹{rf_pred:,.0f}")
-    
-    higher = "Linear Regression" if lr_pred > rf_pred else "Random Forest"
-    st.markdown(f"**Higher Profit Model:** {higher}")
+    prediction = model.predict(input_df)[0]
+    st.success(f"💰 **Predicted Profit: ₹{prediction:,.2f}**")
+
+# ----------------------------
+# Show Dataset (Optional)
+# ----------------------------
+with st.expander("Show Dataset"):
+    st.dataframe(df)
+
